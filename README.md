@@ -22,4 +22,6 @@ Resources/References
 
 
 
-git@github.com:PrimeTimeTran/ML_DBT_Classifier.git
+git remote add origin git@github.com:PrimeTimeTran/ML_DBT_Classifier.git
+git branch -M main
+git push -u origin main
