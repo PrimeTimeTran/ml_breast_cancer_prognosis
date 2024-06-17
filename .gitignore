@@ -315,6 +315,9 @@ tags
 *.code-workspace
 
 # End of https://www.toptal.com/developers/gitignore/api/linux,macos,python,jupyternotebooks,intellij+all,vim,vscode
-
-
-tmp
+#
+tmp/imgs/**
+tmp/initial_data/**
+tmp/test/**
+tmp/train/**
+tmp/validation/**
