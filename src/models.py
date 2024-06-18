@@ -12,7 +12,7 @@ import tensorflow as tf
 from tensorflow.python.keras.models import Sequential
 from tensorflow.python.keras.layers import SimpleRNN, Dense
 
-from .seep_deep import SeepDeep
+from .data_loader import DataLoader
 
 from .utils import (
     setup_save_directory,
@@ -77,7 +77,7 @@ def base_model(type, clf):
     print("Loading MNIST Data...")
 
     print("Loading Training Data...")
-    data = SeepDeep()
+    data = DataLoader()
     img_train, labels_train = data.load_training()
     train_img = np.array(img_train)
     train_labels = np.array(labels_train)

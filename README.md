@@ -18,9 +18,12 @@ DBT-P00538
 
 
 ## TODO
+- [x] Build web Dicom viewer
 - [ ] Build model
+  - [ ] KNN
+  - [ ] SVM
+  - [ ] MLP
 - [ ] Deploy server
-- [ ] Build web Dicom viewer
 - [ ] Send Dicom from client to server
 - [ ] Get prognosis from server using model
 

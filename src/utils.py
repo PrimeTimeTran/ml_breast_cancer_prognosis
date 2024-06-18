@@ -25,9 +25,9 @@ def create_log_file(name):
     return open(f'{logs_dir}/{name}', "w")
 
 def create_pickle(clf, model_type):
-    with open(f'tmp/models/{model_type}_MNIST.pickle', 'wb') as f:
+    with open(f'tmp/models/{model_type}_DBT.pickle', 'wb') as f:
         pickle.dump(clf, f)
-    pickle_in = open(f'tmp/models/{model_type}_MNIST.pickle', 'rb')
+    pickle_in = open(f'tmp/models/{model_type}_DBT.pickle', 'rb')
     clf = pickle.load(pickle_in)
     return clf
 

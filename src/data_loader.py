@@ -7,7 +7,7 @@ from array import array
 
 from .utils import data_dir
 
-class SeepDeep(object):
+class DataLoader(object):
     def __init__(self):
         self.path = 'tmp/dataset'
 
