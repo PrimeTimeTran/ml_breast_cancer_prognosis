@@ -9,10 +9,6 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn import model_selection, svm, preprocessing
 from sklearn.metrics import accuracy_score, confusion_matrix
 
-import tensorflow as tf
-from tensorflow.python.keras.models import Sequential
-from tensorflow.python.keras.layers import SimpleRNN, Dense
-
 from .data_loader import DataLoader
 
 from .utils import (
