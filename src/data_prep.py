@@ -1,12 +1,20 @@
 import os
-import csv
 import re
+import csv
 
 import pandas as pd
 import matplotlib.pyplot as plt
 
 from .dcm_reader import view_image
 from .helpers import script_dir, get_data_file, get_files
+
+def update_column_index(set_type):
+    csv_file = get_data_file(set_type)
+    df = pd.read_csv(csv_file)
+    cols = list(df.columns)
+    cols[1], cols[2] = cols[2], cols[1]
+    df = df[cols]
+    df.to_csv(csv_file, index=False)
 
 
 def sort_by_patient_ids(patient_id):
@@ -61,8 +69,6 @@ def cleanse_data(set_type):
     print(cleaned_counts)
     df_cleaned.to_csv(csv_file, index=False)
 
-# Initial plan was to only select patients with
-# 4 images but many of cases where cancer was found only had 2 images
 def generate_pngs(set_type):
     csv_file = get_data_file(set_type)
     df = pd.read_csv(csv_file)
@@ -70,10 +76,11 @@ def generate_pngs(set_type):
     patient_ids_with_2_or_more = patient_counts[patient_counts >= 2].index.tolist()
     patient_ids_with_2_or_more.sort(key=sort_by_patient_ids)
 
+    print(f'patient_counts {patient_counts}')
     for patient_idx, patient_id in enumerate(patient_ids_with_2_or_more):
         num = int(re.findall(r'\d+', patient_id)[0])
-        if num < 288:
-            continue
+        # if num < 288:
+        #     continue
 
         patient_rows = df[df['PatientID'] == patient_id]
         for _, row in patient_rows.iterrows():
@@ -84,7 +91,7 @@ def generate_pngs(set_type):
                     actual_row_number = specific_row.index[0]
                     view_image(set_type, df, plt, actual_row_number)
                 else:
-                    print(specific_row)
+                    print(f'specific_row {specific_row}')
             except Exception as e:
                 print(f"An error occurred: {e}")
 

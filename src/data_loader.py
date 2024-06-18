@@ -7,86 +7,44 @@ from array import array
 
 class DataLoader(object):
     def __init__(self):
-        self.path = 'tmp/dataset'
-
-        self.test_img_fname = 'tmp/imgs/test'
-        self.test_lbl_fname = 'tmp/test/BCS-DBT-labels-test-PHASE-2.csv'
-
-        self.train_img_fname = 'tmp/imgs/train'
+        self.test_lbl_fname = 'tmp/test/BCS-DBT-labels-test-v2.csv'
         self.train_lbl_fname = 'tmp/train/BCS-DBT-labels-train-v2.csv'
 
-        self.test_images = []
-        self.test_labels = []
+    def load_training(self):
+        data = pd.read_csv(self.train_lbl_fname)
+        images = self.load_images('train', data['PatientID'], data['StudyUID'], data['View'])
+        labels = self.convert_labels(data)
+        return images, labels, data['PatientID']
 
-        self.train_images = []
-        self.train_labels = []
 
     def load_testing(self):
-        ims, labels = self.load(os.path.join(self.path, self.test_img_fname),
-                                os.path.join(self.path, self.test_lbl_fname))
+        data = pd.read_csv(self.test_lbl_fname)
+        images = self.load_images('test', data['PatientID'], data['StudyUID'], data['View'])
+        labels = self.convert_labels(data)
+        return images, labels, data['PatientID']
 
-        self.test_images = ims
-        self.test_labels = labels
+    def convert_labels(self, data):
+        label_map = {'Normal': 0, 'Actionable': 1, 'Benign': 2, 'Cancer': 3}
+        labels = []
+        for _, row in data.iterrows():
+            if row['Normal'] == 1:
+                labels.append(label_map['Normal'])
+            elif row['Actionable'] == 1:
+                labels.append(label_map['Actionable'])
+            elif row['Benign'] == 1:
+                labels.append(label_map['Benign'])
+            elif row['Cancer'] == 1:
+                labels.append(label_map['Cancer'])
+        return np.array(labels)
 
-        return ims, labels
-
-    def load_training(self):
-        df = pd.read_csv(self.train_lbl_fname)
-
-        img_train = []
-        labels_train = []
-        for _, row in df.iterrows():
-            patient_id = row['PatientID']
-            study_uid = row['StudyUID']
-            view = row['View']
-
-            img_path = f"{self.train_img_fname}/{patient_id}-{view}.png"
-
-            img = io.imread(img_path)
-            img_train.append(img)
-            labels = [row['Normal'], row['Actionable'], row['Benign'], row['Cancer']]
-            labels_train.append(labels)
-
-        img_train = np.array(img_train)
-        labels_train = np.array(labels_train)
-
-        return img_train, labels_train
-
-    @classmethod
-    def load(cls, path_img, path_lbl):
-        with open(path_lbl, 'rb') as file:
-            magic, size = struct.unpack(">II", file.read(8))
-            if magic != 2049:
-                raise ValueError('Magic number mismatch, expected 2049,'
-                                 'got {}'.format(magic))
-
-            labels = array("B", file.read())
-
-        with open(path_img, 'rb') as file:
-            magic, size, rows, cols = struct.unpack(">IIII", file.read(16))
-            if magic != 2051:
-                raise ValueError('Magic number mismatch, expected 2051,'
-                                 'got {}'.format(magic))
-
-            image_data = array("B", file.read())
-
+    def load_images(self, set_type, patient_ids, study_uids, views):
         images = []
-        for i in range(size):
-            images.append([0] * rows * cols)
+        for pid, suid, view in zip(patient_ids, study_uids, views):
+            image = self.load_image(set_type, pid, view)
+            images.append(image)
+        return images
 
-        for i in range(size):
-            images[i][:] = image_data[i * rows * cols:(i + 1) * rows * cols]
-
-        return images, labels
-
-    @classmethod
-    def display(cls, img, width=28, threshold=200):
-        render = ''
-        for i in range(len(img)):
-            if i % width == 0:
-                render += '\n'
-            if img[i] > threshold:
-                render += '@'
-            else:
-                render += '.'
-        return render
+    def load_image(self, set_type, patient_id, view):
+        img_path = f"tmp/imgs/{set_type}/{patient_id}-{view}.png"
+        img = io.imread(img_path)
+        return img

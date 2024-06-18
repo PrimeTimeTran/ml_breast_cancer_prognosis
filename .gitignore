@@ -321,3 +321,6 @@ tmp/initial/**
 tmp/test/**
 tmp/train/**
 tmp/validation/**
+tmp/models/**
+tmp/output/**
+tmp/plots/**

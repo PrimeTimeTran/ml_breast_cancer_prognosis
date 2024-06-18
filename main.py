@@ -1,5 +1,5 @@
 import sys
-from src.data_prep import update_paths, cleanse_data, generate_pngs, sort_rows
+from src.data_prep import update_paths, cleanse_data, generate_pngs, sort_rows, update_column_index
 
 from src.model import Model
 
@@ -17,6 +17,8 @@ if __name__ == "__main__":
         cleanse_data(set_type)
     elif fn_name == 'generate_pngs':
         generate_pngs(set_type)
+    elif fn_name == 'update_column_index':
+        update_column_index(set_type)
     elif fn_name == 'sort_rows':
         sort_rows(set_type)
     elif fn_name == 'train_model':
