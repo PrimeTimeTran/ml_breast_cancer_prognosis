@@ -5,14 +5,12 @@ import numpy as np
 from skimage import io
 from array import array
 
-from .utils import data_dir
-
 class DataLoader(object):
     def __init__(self):
         self.path = 'tmp/dataset'
 
         self.test_img_fname = 'tmp/imgs/test'
-        self.test_lbl_fname = 'tmp/imgs/test'
+        self.test_lbl_fname = 'tmp/test/BCS-DBT-labels-test-PHASE-2.csv'
 
         self.train_img_fname = 'tmp/imgs/train'
         self.train_lbl_fname = 'tmp/train/BCS-DBT-labels-train-v2.csv'
