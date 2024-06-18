@@ -14,10 +14,11 @@ from sklearn.metrics import accuracy_score, confusion_matrix, precision_score, r
 from .data_loader import DataLoader
 
 from .utils import (
-    setup_save_directory,
+    load_pickle,
+    plot_file_name,
     create_log_file,
     image_file_name,
-    plot_file_name,
+    setup_save_directory,
 )
 
 class Model:
@@ -45,6 +46,8 @@ class Model:
             return RandomForestClassifier(n_estimators=100, random_state=42)
 
     def create_pickle(self):
+        # ckpt - old, pickle allows embedding malicious code
+        # safetensor -
         with open(f'tmp/models/{self.type}_DBT.pickle', 'wb') as f:
             pickle.dump(self.classifier, f)
         pickle_in = open(f'tmp/models/{self.type}_DBT.pickle', 'rb')
@@ -159,4 +162,12 @@ class Model:
         accuracy = accuracy_score(y_test, y_pred)
         conf_mat = confusion_matrix(y_test, y_pred)
         self.render_confusion_matrix(confidence, y_pred, accuracy, conf_mat)
-        print("Done")
+        print("Training done")
+
+    def predict(self, data_to_predict):
+        loaded_model = load_pickle('KNN')
+        if loaded_model:
+            predictions = loaded_model.predict(data_to_predict)
+            print(predictions)
+        else:
+            print("Failed to load the model.")
