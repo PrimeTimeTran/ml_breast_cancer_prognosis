@@ -48,3 +48,8 @@ DBT-P00538
 - [Deep Learning Based Methods for Breast Cancer Diagnosis: A Systematic Review and Future Direction](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC9818155/)
 - [Dataset](https://www.cancerimagingarchive.net/collection/breast-cancer-screening-dbt/)
 - [Duke Writeup](https://sites.duke.edu/mazurowski/resources/digital-breast-tomosynthesis-database/)
+
+deactivate
+/opt/anaconda3/bin/python -m venv .venv
+source .venv/bin/activate
+which python
