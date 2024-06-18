@@ -72,7 +72,7 @@ def generate_pngs(set_type):
 
     for patient_idx, patient_id in enumerate(patient_ids_with_2_or_more):
         num = int(re.findall(r'\d+', patient_id)[0])
-        if num < 68:
+        if num < 288:
             continue
 
         patient_rows = df[df['PatientID'] == patient_id]
