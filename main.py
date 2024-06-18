@@ -2,6 +2,7 @@ import sys
 from src.data_prep import update_paths, cleanse_data, generate_pngs, sort_rows, update_column_index
 
 from src.model import Model
+from src.sk_learn_wrapper import save_tensor
 
 if __name__ == "__main__":
     if len(sys.argv) != 3:
@@ -23,6 +24,8 @@ if __name__ == "__main__":
         sort_rows(set_type)
     elif fn_name == 'train_model':
         Model('KNN')
+    elif fn_name == 'save_tensor':
+        save_tensor()
     else:
         print(f"Function {fn_name} is not recognized.")
         sys.exit(1)
