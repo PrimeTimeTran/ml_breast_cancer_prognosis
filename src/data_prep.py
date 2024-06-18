@@ -1,12 +1,11 @@
 import os
 import re
 import csv
-
 import pandas as pd
 import matplotlib.pyplot as plt
 
 from .dcm_reader import view_image
-from .helpers import script_dir, get_data_file, get_files
+from .utils import base_dir, get_data_file, get_files
 
 def update_column_index(set_type):
     csv_file = get_data_file(set_type)
@@ -15,7 +14,6 @@ def update_column_index(set_type):
     cols[1], cols[2] = cols[2], cols[1]
     df = df[cols]
     df.to_csv(csv_file, index=False)
-
 
 def sort_by_patient_ids(patient_id):
     match = re.match(r"([a-zA-Z]+)([0-9]+)", patient_id)
@@ -26,7 +24,7 @@ def sort_by_patient_ids(patient_id):
 
 def update_folder_name(row, set_type):
     search_dir = os.path.join(
-        script_dir, f'../tmp/{set_type}/manifest-1617905855234/Breast-Cancer-Screening-DBT')
+        base_dir, f'../tmp/{set_type}/manifest-1617905855234/Breast-Cancer-Screening-DBT')
     if len(row) > 2 and row[3] != None:
         old_folder_path = row[3]
         old_folder_name = old_folder_path.split('/')[-2]

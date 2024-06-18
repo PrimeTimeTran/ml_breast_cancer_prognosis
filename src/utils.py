@@ -40,3 +40,19 @@ def create_log_file(name):
             os.remove(prev_log_path)
         shutil.move(log_path, prev_log_path)
     return open(log_path, "w")
+
+
+
+def get_data_file(set_type):
+    return os.path.join(script_dir, f'../tmp/{set_type}/BCS-DBT-file-paths-{set_type}-v2.csv')
+
+
+def get_files(set_type):
+    return [
+        os.path.join(
+            base_dir, f'../tmp/{set_type}/BCS-DBT-file-paths-{set_type}-v2.csv'),
+        os.path.join(
+            base_dir, f'../tmp/{set_type}/BCS-DBT-labels-{set_type}-v2.csv'),
+        os.path.join(
+            base_dir, f'../tmp/{set_type}/BCS-DBT-boxes-{set_type}-v2.csv')
+    ]
