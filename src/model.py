@@ -1,32 +1,30 @@
-import sys
 import pickle
 import numpy as np
-from matplotlib import style
+from sklearn import svm
 import matplotlib.pyplot as plt
-from sklearn.neural_network import MLPClassifier
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.ensemble import RandomForestClassifier
-from sklearn import model_selection, svm, preprocessing
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, confusion_matrix, precision_score, recall_score, f1_score
 
+from torch.utils.data import DataLoader as TorchDataLoader
 
 from .data_loader import DataLoader
 
 from .utils import (
     load_pickle,
     plot_file_name,
-    create_log_file,
+    setup_logger,
     image_file_name,
     setup_save_directory,
 )
 
 class Model:
     def __init__(self, type):
-        style.use("ggplot")
         setup_save_directory()
+        plt.style.use("ggplot")
         self.type = type
-        sys.stdout = create_log_file(f"{type}-summary.log")
+        self.logger = setup_logger(f"{type}-summary.log")
         self.classifier = self.get_model_type()
         self.train()
 
@@ -35,14 +33,14 @@ class Model:
         # RandomForestClassifier, KNeighborsClassifier
         if self.type == "KNN":
             # KNN doesn't have confidence score.
-            print("KNearestNeighbors with n_neighbors = 5, algorithm = auto, n_jobs = 10")
+            self.logger.info("KNearestNeighbors with n_neighbors = 5, algorithm = auto, n_jobs = 10")
             return KNeighborsClassifier(n_neighbors=5, algorithm="auto", n_jobs=10)
         elif self.type == "SVM":
             # Has confidence score.
-            print("SupportVectorMachines with gamma=0.1, kernel='poly'")
+            self.logger.info("SupportVectorMachines with gamma=0.1, kernel='poly'")
             return svm.SVC(gamma=0.1, kernel="poly")
         else:
-            print("RandomForestClassifier with n_estimators=100, random_state=42")
+            self.logger.info("RandomForestClassifier with n_estimators=100, random_state=42")
             return RandomForestClassifier(n_estimators=100, random_state=42)
 
     def create_pickle(self):
@@ -54,33 +52,33 @@ class Model:
         self.classifier = pickle.load(pickle_in)
 
     def render_confusion_matrix(self, confidence, y_pred, accuracy, conf_mat):
-        print("Trained Classifier Confidence: ", confidence)
-        print("Predicted Values: ", y_pred)
-        print("Accuracy of Classifier on Validation Image Data: ", accuracy)
-        print("Confusion Matrix: ", conf_mat)
+        self.logger.info(f"Trained Classifier Confidence: {confidence}")
+        self.logger.info(f"Predicted Values: {y_pred}")
+        self.logger.info(f"Accuracy of Classifier on Validation Image Data: {accuracy}")
+        self.logger.info(f"Confusion Matrix: \n{conf_mat}")
 
         plt.matshow(conf_mat)
         plt.title("Confusion Matrix for Validation Data")
         plt.colorbar()
         plt.ylabel("True label")
         plt.xlabel("Predicted label")
-        plt.savefig(plot_file_name("validation", self.type))
+        plt.savefig(plot_file_name(self.type, "validation"))
 
-        print(f"Making Predictions on Test Input Images: {self.test_labels_pred}")
-        print(f"Calculating Accuracy of Trained Classifier on Test Data: {accuracy}")
+        self.logger.info(f"Making Predictions on Test Input Images: {self.test_labels_pred}")
+        self.logger.info(f"Calculating Accuracy of Trained Classifier on Test Data: {accuracy}")
 
-        print("Creating Confusion Matrix for Test Data...")
+        self.logger.info("Creating Confusion Matrix for Test Data...")
         conf_mat_test = confusion_matrix(self.test_labels, self.test_labels_pred)
 
-        print("Predicted Labels for Test Images: ", self.test_labels_pred)
-        print("Accuracy of Classifier on Test Images: ", accuracy)
-        print("Confusion Matrix for Test Data:", conf_mat_test)
+        self.logger.info(f"Predicted Labels for Test Images: {self.test_labels_pred}")
+        self.logger.info(f"Accuracy of Classifier on Test Images: {accuracy}")
+        self.logger.info(f"Confusion Matrix for Test Data: \n{conf_mat_test}")
         plt.matshow(conf_mat_test)
         plt.title("Confusion Matrix for Test Data")
         plt.colorbar()
         plt.ylabel("True label")
         plt.xlabel("Predicted label")
-        plt.savefig(plot_file_name("test", self.type))
+        plt.savefig(plot_file_name(self.type, "test"))
         plt.clf()
 
         num_samples = min(len(self.test_img), 20)
@@ -100,40 +98,42 @@ class Model:
             plt.colorbar()
             filename = image_file_name(self.type, idx, label)
             plt.savefig(filename)
-            # plt.show()
             plt.clf()
 
     def train(self):
-        print("Training Starting...")
-        print("Loading Training Data Set...")
-        data = DataLoader()
-        img_train, labels_train, _ = data.load_training()
-        train_img = np.array(img_train)
-        train_labels = np.array(labels_train)
+        self.logger.info("Training Starting...")
 
-        print(f"Shape of training images: {train_img.shape}")
-        print(f"Shape of training labels: {train_labels.shape}")
+        self.logger.info("Loading Training Data Set...")
+        train_dataset = DataLoader('tmp/train/BCS-DBT-labels-train-v2.csv', 'train')
+        train_loader = TorchDataLoader(train_dataset, batch_size=32, shuffle=True, num_workers=4)
 
-        print("Loading Testing Data Set...")
-        img_test, labels_test, test_patient_ids = data.load_testing()
-        self.test_img = np.array(img_test)
-        self.test_labels = np.array(labels_test)
+        self.logger.info("Loading Testing Data Set...")
+        test_dataset = DataLoader('tmp/test/BCS-DBT-labels-test-v2.csv', 'test')
+        test_loader = TorchDataLoader(test_dataset, batch_size=32, shuffle=False, num_workers=4)
+
+        # Convert loaded data to numpy arrays for logging
+        img_train, labels_train, train_patient_ids = self.load_full_data(train_loader)
+        img_test, labels_test, test_patient_ids = self.load_full_data(test_loader)
+
+        self.test_img = img_test
+        self.test_labels = labels_test
         self.test_patient_ids = test_patient_ids
 
-        print(f"Shape of test images: {self.test_img.shape}")
-        print(f"Shape of test labels: {self.test_labels.shape}")
+        self.logger.info(f"Shape of training images: {img_train.shape}")
+        self.logger.info(f"Shape of training labels: {labels_train.shape}")
+        self.logger.info(f"Shape of test images: {self.test_img.shape}")
+        self.logger.info(f"Shape of test labels: {self.test_labels.shape}")
+        self.logger.info(f"Training label distribution: {np.bincount(labels_train)}")
+        self.logger.info(f"Testing label distribution: {np.bincount(self.test_labels)}")
 
-        print(f"Training label distribution: {np.bincount(train_labels)}")
-        print(f"Testing label distribution: {np.bincount(self.test_labels)}")
+        x = img_train
+        y = labels_train
 
-        x = train_img
-        y = train_labels
-
-        print(f"Original shape of x: {x.shape}")
-        print(f"Original shape of y: {y.shape}")
+        self.logger.info(f"Original shape of x: {x.shape}")
+        self.logger.info(f"Original shape of y: {y.shape}")
 
         x_flat = x.reshape(x.shape[0], -1)
-        print(f"Reshaped x: {x_flat.shape}")
+        self.logger.info(f"Reshaped x: {x_flat.shape}")
         y_flat = y
 
         x_train, x_test, y_train, y_test = train_test_split(x_flat, y_flat, test_size=0.1, stratify=y_flat)
@@ -141,33 +141,47 @@ class Model:
         self.create_pickle()
 
         accuracy = self.classifier.score(x_test, y_test)
-        print(f"Model accuracy: {accuracy}")
+        self.logger.info(f"Model accuracy: {accuracy}")
 
         y_pred = self.classifier.predict(x_test)
         precision = precision_score(y_test, y_pred, average='macro')
         recall = recall_score(y_test, y_pred, average='macro')
         f1 = f1_score(y_test, y_pred, average='macro')
 
-        print(f"Precision: {precision:.2f}")
-        print(f"Recall: {recall:.2f}")
-        print(f"F1-score: {f1:.2f}")
+        self.logger.info(f"Precision: {precision:.2f}")
+        self.logger.info(f"Recall: {recall:.2f}")
+        self.logger.info(f"F1-score: {f1:.2f}")
 
         test_img_flat = self.test_img.reshape(self.test_img.shape[0], -1)
         self.test_labels_pred = self.classifier.predict(test_img_flat)
-        print(f"Predicted labels for test image: {self.test_labels_pred}")
+        self.logger.info(f"Predicted labels for test image: {self.test_labels_pred}")
 
-        print("Calculating Accuracy of trained Classifier...")
+        self.logger.info("Calculating Accuracy of trained Classifier...")
         confidence = self.classifier.score(x_test, y_test)
         y_pred = self.classifier.predict(x_test)
         accuracy = accuracy_score(y_test, y_pred)
         conf_mat = confusion_matrix(y_test, y_pred)
         self.render_confusion_matrix(confidence, y_pred, accuracy, conf_mat)
-        print("Training done")
+        self.logger.info("Training done")
+
+    def load_full_data(self, data_loader):
+        images = []
+        labels = []
+        patient_ids = []
+        batch_idx = 0
+        for batch in data_loader:
+            self.logger.info(f"Batch index: {batch_idx}")
+            images.extend(batch['image'].numpy())
+            labels.extend(batch['label'].numpy())
+            patient_ids.extend(batch['patient_id'].numpy())
+            batch_idx+=1
+
+        return np.array(images), np.array(labels), np.array(patient_ids)
 
     def predict(self, data_to_predict):
         loaded_model = load_pickle('KNN')
         if loaded_model:
             predictions = loaded_model.predict(data_to_predict)
-            print(predictions)
+            self.logger.info(predictions)
         else:
-            print("Failed to load the model.")
+            self.logger.info("Failed to load the model.")

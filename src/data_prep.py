@@ -77,8 +77,11 @@ def generate_pngs(set_type):
     print(f'patient_counts {patient_counts}')
     for patient_idx, patient_id in enumerate(patient_ids_with_2_or_more):
         num = int(re.findall(r'\d+', patient_id)[0])
-        # if num < 288:
-        #     continue
+        # DBT-P03906
+        # Final: 3906
+        # Last check 2926....
+        if num < 3906:
+            continue
 
         patient_rows = df[df['PatientID'] == patient_id]
         for _, row in patient_rows.iterrows():
