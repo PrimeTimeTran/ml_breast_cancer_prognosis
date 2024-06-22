@@ -3,7 +3,6 @@ import sys
 import shutil
 import pickle
 import logging
-import numpy as np
 
 base_dir = os.path.dirname(os.path.abspath(__file__))
 save_dir = os.path.join(base_dir, '../tmp/output')

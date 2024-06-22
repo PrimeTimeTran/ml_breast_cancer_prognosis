@@ -1,10 +1,9 @@
 import os
-import pandas as pd
 import torch
-from torch.utils.data import Dataset
-from torchvision import transforms
+import pandas as pd
 from PIL import Image
-import matplotlib.pyplot as plt
+from torchvision import transforms
+from torch.utils.data import Dataset
 
 class DataLoader(Dataset):
     def __init__(self, csv_file, set_type):
@@ -22,7 +21,7 @@ class DataLoader(Dataset):
     def __getitem__(self, idx):
         row = self.data.iloc[idx]
         img_path = os.path.join(self.image_dir, f"{row['PatientID']}-{row['View']}.png")
-        
+
         image = self.load_image(img_path)
         label = self.convert_label(row)
         patient_id = row['PatientID']

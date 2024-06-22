@@ -75,13 +75,11 @@ def generate_pngs(set_type):
     patient_ids_with_2_or_more.sort(key=sort_by_patient_ids)
 
     print(f'patient_counts {patient_counts}')
-    for patient_idx, patient_id in enumerate(patient_ids_with_2_or_more):
-        num = int(re.findall(r'\d+', patient_id)[0])
-        # DBT-P03906
-        # Final: 3906
-        # Last check 2926....
-        if num < 3906:
-            continue
+    for _, patient_id in enumerate(patient_ids_with_2_or_more):
+        # INFO: Used to "pick up where you left off" in generating images
+        # num = int(re.findall(r'\d+', patient_id)[0])
+        # if num < 3906:
+        #     continue
 
         patient_rows = df[df['PatientID'] == patient_id]
         for _, row in patient_rows.iterrows():
