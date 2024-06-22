@@ -17,22 +17,41 @@ from sklearn.linear_model import Perceptron
 from sklearn.naive_bayes import GaussianNB
 from sklearn.neighbors import KNeighborsClassifier
 
-model = Perceptron()
+# model = Perceptron()
+# model = svm.SVC()
+# model = KNeighborsClassifier(n_neighbors=1)
+model = GaussianNB()
 
-with open("../tmp/train/BCS-DBT-file-paths-train-v2.csv") as f:
+with open("banknotes.csv") as f:
   reader = csv.reader(f)
   next(reader)
   data = []
-  evidence = [row['evidence'] for row in data]
-  labels = [row['labels'] for row in data]
+  for row in reader:
+    data.append({
+      "evidence": [float(cell) for cell in row[:4]],
+      "label": "Authenticate" if row[4] == "0" else "Counterfeit"
+    })
 
-  x_training, x_testing, y_training, y_testing  = train_test_split(evidence, labels, test_size=0.5)
+  holdout = int(0.5 * len(data))
+  random.shuffle(data)
+  testing = data[:holdout]
+  training = data[:holdout]
+
+  x_training = [row['evidence'] for row in training]
+  y_training = [row['label'] for row in training]
   model.fit(x_training, y_training)
+
+  x_testing = [row['evidence'] for row in testing]
+  y_testing = [row['label'] for row in testing]
   predictions = model.predict(x_testing)
 
-  correct = (y_testing == predictions).sum()
-  incorrect = (y_testing != predictions).sum()
-  total = len(predictions)
+  correct, incorrect, total = 0, 0, 0
+  for actual, predicted in zip(y_testing, predictions):
+    total += 1
+    if actual == predicted:
+      correct += 1
+    else: 
+      incorrect += 1
 
   print(f"Results for model: {type(model).__name__}")
   print(f"Correct: {correct}")
