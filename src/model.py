@@ -1,5 +1,6 @@
 import pickle
 import numpy as np
+import pandas as pd
 from sklearn import svm
 import matplotlib.pyplot as plt
 from sklearn.neighbors import KNeighborsClassifier
@@ -27,6 +28,23 @@ class Model:
         self.logger = setup_logger(f"{type}-summary.log")
         self.classifier = self.get_model_type()
         self.train()
+        self.document_summary()
+
+    def document_summary(self):
+        csv_file = '/Users/future/Documents/Work/_Main/.Projects/ML_DBT_Classifier/tmp/model_summaries.csv'
+        df = pd.read_csv(csv_file)
+        new_data = {
+            'Model': [self.model_type],
+            'Accuracy': [f'{self.accuracy:.2f}'],
+            'Images(#)': [self.train_dataset_length],
+            'Precision': [f'{self.precision:.2f}'],
+            'Recall': [f'{self.recall:.2f}'],
+            'F1-score': [f'{self.f1:.2f}']
+        }
+        df_new = pd.DataFrame(new_data)
+        df = pd.concat([df, df_new], ignore_index=True)
+        df.to_csv(csv_file, index=False)
+        print(f"Data appended and written back to {csv_file}.")
 
     def get_model_type(self):
         # These don't use epochs.
@@ -45,7 +63,7 @@ class Model:
 
     def create_pickle(self):
         # ckpt - old, pickle allows embedding malicious code
-        # safetensor -
+        # safetensor
         with open(f'tmp/models/{self.model_type}_DBT.pickle', 'wb') as f:
             pickle.dump(self.classifier, f)
         pickle_in = open(f'tmp/models/{self.model_type}_DBT.pickle', 'rb')
@@ -111,6 +129,7 @@ class Model:
 
         self.logger.info("Loading Training Data Set...")
         train_dataset = DataLoader('tmp/train/BCS-DBT-labels-train-v2.csv', 'train')
+        self.train_dataset_length = len(train_dataset)
         train_loader = TorchDataLoader(train_dataset, batch_size=2, shuffle=True, num_workers=4)
 
         self.logger.info("Loading Testing Data Set...")
@@ -145,17 +164,17 @@ class Model:
         self.classifier.fit(x_train, y_train)
         self.create_pickle()
 
-        accuracy = self.classifier.score(x_test, y_test)
-        self.logger.info(f"Model accuracy: {accuracy}")
+        self.accuracy = self.classifier.score(x_test, y_test)
+        self.logger.info(f"Model accuracy: {self.accuracy}")
 
         y_pred = self.classifier.predict(x_test)
-        precision = precision_score(y_test, y_pred, average='macro')
-        recall = recall_score(y_test, y_pred, average='macro')
-        f1 = f1_score(y_test, y_pred, average='macro')
+        self.precision = precision_score(y_test, y_pred, average='macro')
+        self.recall = recall_score(y_test, y_pred, average='macro')
+        self.f1 = f1_score(y_test, y_pred, average='macro')
 
-        self.logger.info(f"Precision: {precision:.2f}")
-        self.logger.info(f"Recall: {recall:.2f}")
-        self.logger.info(f"F1-score: {f1:.2f}")
+        self.logger.info(f"Precision: {self.precision:.2f}")
+        self.logger.info(f"Recall: {self.recall:.2f}")
+        self.logger.info(f"F1-score: {self.f1:.2f}")
 
         test_img_flat = self.test_img.reshape(self.test_img.shape[0], -1)
         self.test_labels_pred = self.classifier.predict(test_img_flat)
