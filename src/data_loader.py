@@ -10,7 +10,7 @@ class DataLoader(Dataset):
     def __init__(self, csv_file, set_type):
         self.data = pd.read_csv(csv_file)
         self.set_type = set_type
-        self.image_dir = f'tmp/imgs/{set_type}'
+        self.image_dir = f'tmp/imgs'
         self.transform = transforms.Compose([
             transforms.Resize((256, 256)),
             transforms.ToTensor()

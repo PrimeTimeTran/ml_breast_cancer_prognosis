@@ -317,3 +317,5 @@ tags
 # End of https://www.toptal.com/developers/gitignore/api/linux,macos,python,jupyternotebooks,intellij+all,vim,vscode
 #
 tmp
+
+src.*

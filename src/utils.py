@@ -9,11 +9,9 @@ save_dir = os.path.join(base_dir, '../tmp/output')
 plots_dir = os.path.join(base_dir, '../tmp/plots')
 logs_dir = os.path.join(base_dir, '../tmp/logs')
 
-def plot_file_name(model_type, train_scope, set_type):
-    return os.path.join(plots_dir, f'{model_type}-{train_scope}-{set_type}-confusion-matrix.png')
-
-def plot_graph_name(model_type, train_scope):
-    return os.path.join(plots_dir, f'{model_type}-{train_scope}-graph.png')
+def save_plot(name):
+    current_datetime = datetime.now().strftime('%m-%d-%y_%H-%M-%S')
+    return os.path.join(plots_dir, f'{name}-{current_datetime}.png')
 
 def load_pickle(model):
     try:
@@ -27,7 +25,6 @@ def load_pickle(model):
         print(f"Error loading the pickle file: {str(e)}")
         return None
 
-
 def setup_save_directory():
     os.makedirs(save_dir, exist_ok=True)
     os.makedirs(plots_dir, exist_ok=True)
@@ -36,9 +33,9 @@ def image_file_name(type, patient_id, label, predicted_label):
     return os.path.join(
         save_dir, f'{type}-{patient_id}-labeled-{label}-labeled-by-model-{predicted_label}.png')
 
-def setup_logger(name):
+def setup_logger(name, scope):
     current_datetime = datetime.now().strftime('%m-%d-%y_%H-%M-%S')
-    log_filename = f"{current_datetime}_{name}-summary.log"
+    log_filename = f"{name}_{scope}_{current_datetime}-summary.log"
     log_path = os.path.join(logs_dir, log_filename)
 
     logger = logging.getLogger(name)
@@ -47,7 +44,7 @@ def setup_logger(name):
     file_handler = logging.FileHandler(log_path)
     console_handler.setLevel(logging.DEBUG)
     file_handler.setLevel(logging.DEBUG)
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(name)s - %(message)s')
     console_handler.setFormatter(formatter)
     file_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
@@ -56,15 +53,14 @@ def setup_logger(name):
     return logger
 
 def get_data_file(set_type):
-    return os.path.join(base_dir, f'../tmp/{set_type}/BCS-DBT-file-paths-{set_type}-v2.csv')
+    return os.path.join(base_dir, f'../tmp/set_{set_type}/BCS-DBT-file-paths-{set_type}-v2.csv')
 
-
-def get_files(set_type):
+def get_files(set_type, scope):
     return [
         os.path.join(
-            base_dir, f'../tmp/{set_type}/BCS-DBT-file-paths-{set_type}-v2.csv'),
+            base_dir, f'../tmp/set_{set_type}/BCS-DBT-file-paths-{set_type}-v2-{scope}.csv'),
         os.path.join(
-            base_dir, f'../tmp/{set_type}/BCS-DBT-labels-{set_type}-v2.csv'),
+            base_dir, f'../tmp/set_{set_type}/BCS-DBT-labels-{set_type}-v2-{scope}.csv'),
         os.path.join(
-            base_dir, f'../tmp/{set_type}/BCS-DBT-boxes-{set_type}-v2.csv')
+            base_dir, f'../tmp/set_{set_type}/BCS-DBT-boxes-{set_type}-v2-{scope}.csv')
     ]

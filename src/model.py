@@ -5,45 +5,50 @@ import pandas as pd
 from sklearn import svm
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
+from imblearn.over_sampling import SMOTE
+from sklearn.preprocessing import StandardScaler
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.inspection import DecisionBoundaryDisplay
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import confusion_matrix, precision_score, recall_score, f1_score, classification_report
+from sklearn.metrics import precision_score, recall_score, f1_score, classification_report, ConfusionMatrixDisplay, confusion_matrix
 
-from torch.utils.data import DataLoader as TorchDataLoader
+from torch.utils.data import DataLoader as TorchLoader
 
 from .data_loader import DataLoader
 
 from .utils import (
     base_dir,
-    plot_file_name,
+    save_plot,
     setup_logger,
     image_file_name,
     setup_save_directory,
-    plot_graph_name,
 )
 
 
 class Model:
-    def __init__(self, model_type, train_scope):
+    def __init__(self, strategy, scope, dataset_name):
         setup_save_directory()
         plt.style.use("ggplot")
-        self.train_scope = train_scope
-        self.model_type = model_type
-        self.logger = setup_logger(model_type)
+        self.dataset_name = dataset_name
+        self.scope = scope
+        self.strategy = strategy
+        self.logger = setup_logger(strategy, scope)
         self.classifier = None
         self.train_imgs = None
         self.train_labels = None
         self.test_imgs = None
         self.test_labels = None
+        self.class_names = ['Normal', 'Actionable', 'Benign', 'Cancer']
+        self.label_map = {0: 'Normal',
+                          1: 'Actionable', 2: 'Benign', 3: 'Cancer'}
 
     @classmethod
     def from_pickle(cls, filepath):
         with open(filepath, 'rb') as f:
             data = pickle.load(f)
 
-        instance = cls(model_type=data['model_type'], train_scope=data['train_scope'])
+        instance = cls(strategy=data['strategy'], scope=data['scope'])
         instance.classifier = data.get('classifier')
         instance.train_imgs = data.get('train_imgs')
         instance.train_labels = data.get('train_labels')
@@ -65,10 +70,10 @@ class Model:
         csv_file = f'{base_dir}/../tmp/training_summaries.csv'
         df = pd.read_csv(csv_file)
         new_data = {
-            'Model': [self.model_type],
+            'Model': [self.strategy],
             'Accuracy': [f'{self.accuracy:.2f}'],
-            'Trained Set(#)': [self.train_set_length],
-            'Test Set(#)': [self.test_set_length],
+            'Trained Set(#)': [self.train_length],
+            'Test Set(#)': [self.test_length],
             'Precision': [f'{self.precision:.2f}'],
             'Recall': [f'{self.recall:.2f}'],
             'F1-score': [f'{self.f1:.2f}'],
@@ -82,11 +87,11 @@ class Model:
 
     def load_dataset(self, set_type):
         self.log(f"Loading {set_type.capitalize()} Data Set...")
-        dataset = DataLoader(
-            f'tmp/{set_type}/BCS-DBT-labels-{set_type}-v2-{self.train_scope}.csv', set_type)
+        file = f'tmp/set_{set_type}/BCS-DBT-labels-{set_type}-v2-{self.scope}.csv'
+        dataset = DataLoader(file, set_type)
         length = len(dataset)
-        loader = TorchDataLoader(
-            dataset, batch_size=32, shuffle=True, num_workers=4)
+        loader = TorchLoader(dataset, batch_size=16,
+                             shuffle=True, num_workers=4)
         return [length, loader]
 
     def load_full_data(self, data_loader):
@@ -102,11 +107,11 @@ class Model:
         return np.array(images), np.array(labels), np.array(patient_ids)
 
     def select_classifier(self):
-        if self.model_type == "KNN":
+        if self.strategy == "KNN":
             self.log(
                 "KNearestNeighbors with n_neighbors = 5, algorithm = auto, n_jobs = 10")
-            return KNeighborsClassifier(algorithm="auto", n_jobs=10)
-        elif self.model_type == "SVM":
+            return KNeighborsClassifier(algorithm="auto", n_jobs=10, n_neighbors=5)
+        elif self.strategy == "SVM":
             self.log(
                 "SupportVectorMachines with gamma=0.1, kernel='poly'")
             return svm.SVC(gamma=0.1, kernel="poly")
@@ -118,15 +123,15 @@ class Model:
     def create_pickle(self):
         self.log("Creating Pickle...")
         data = {
-            'train_scope': self.train_scope,
+            'scope': self.scope,
             'train_imgs': self.train_imgs,
             'train_labels': self.train_labels,
             'test_imgs': self.test_imgs,
             'test_labels': self.test_labels,
-            'model_type': self.model_type
+            'strategy': self.strategy
         }
 
-        pickle_file = f'tmp/models/{self.model_type.lower()}_{self.train_scope.lower()}_classifier.pickle'
+        pickle_file = f'tmp/models/{self.strategy.lower()}_{self.scope.lower()}_classifier.pickle'
 
         with open(pickle_file, 'wb') as f:
             pickle.dump(data, f)
@@ -151,17 +156,26 @@ class Model:
             self.train_imgs.shape[0], -1), self.train_labels)
 
     def render_matrix(self, set_type):
-        matrix = confusion_matrix(self.test_labels, self.test_labels_pred)
-        plt.matshow(matrix)
-        plt.title(f"Confusion Matrix for {set_type.capitalize()} Data")
-        plt.colorbar()
-        plt.ylabel("True label")
-        plt.xlabel("Predicted label")
-        plt.savefig(plot_file_name(self.model_type, self.train_scope, set_type))
-        plt.clf()
+        cm = confusion_matrix(self.test_labels, self.test_labels_pred)
+        self.log("\n\nConfusion Matrix:")
+        self.log(f'\n{cm}')
+        unique_classes = np.unique(np.concatenate(
+            (self.test_labels, self.test_labels_pred)))
+
+        if not set(self.label_map.keys()).issuperset(set(unique_classes)):
+            print(f"Unique classes in data: {unique_classes}")
+            print(f"Label mapping: {self.label_map}")
+            raise ValueError(
+                "The unique classes in data do not match the expected label mapping.")
+
+        disp = ConfusionMatrixDisplay.from_predictions(
+            self.test_labels, self.test_labels_pred, display_labels=self.class_names)
+        disp.plot(cmap='viridis')
+        plt.title(f"Confusion Matrix: {set_type} set")
+        plt.savefig(save_plot(f'{self.strategy}-{self.scope}-confusion-matrix'))
 
     def render_sampled_test_imgs_with_labels(self):
-        num_samples = min(len(self.test_imgs), 20)
+        num_samples = min(len(self.test_imgs), 16)
         indices = np.random.randint(0, len(self.test_imgs), num_samples)
         for _, i in enumerate(indices):
             if i >= len(self.test_imgs):
@@ -180,23 +194,30 @@ class Model:
 
             plt.colorbar()
             filename = image_file_name(
-                self.model_type, patient_id, label, predicted_label)
+                self.strategy, patient_id, label, predicted_label)
             plt.savefig(filename)
             plt.clf()
 
     def render_knn_plot(self):
         self.logger.info("Plotting KNN...")
+        print("Shape of self.train_imgs:", self.train_imgs.shape)
+        print("Shape of self.test_imgs:", self.test_imgs.shape)
+
         train_imgs_flat = self.train_imgs.reshape(len(self.train_imgs), -1)
         test_imgs_flat = self.test_imgs.reshape(len(self.test_imgs), -1)
+        scaler = StandardScaler()
+        train_imgs_flat = scaler.fit_transform(train_imgs_flat)
+        test_imgs_flat = scaler.transform(test_imgs_flat)
+
         pca = PCA(n_components=2)
         x_train_pca = pca.fit_transform(train_imgs_flat)
         x_test_pca = pca.transform(test_imgs_flat)
-        
         _, axs = plt.subplots(ncols=2, figsize=(12, 5))
-        
+
         for ax, weights in zip(axs, ("uniform", "distance")):
             self.classifier.set_params(weights=weights)
             self.classifier.fit(x_train_pca, self.train_labels)
+
             disp = DecisionBoundaryDisplay.from_estimator(
                 self.classifier,
                 x_test_pca,
@@ -206,6 +227,7 @@ class Model:
                 alpha=0.5,
                 ax=ax,
             )
+
             scatter = disp.ax_.scatter(x_test_pca[:, 0], x_test_pca[:, 1], c=self.test_labels, edgecolors="k")
             disp.ax_.legend(
                 scatter.legend_elements()[0],
@@ -214,14 +236,16 @@ class Model:
                 title="Classes",
             )
             ax.set_title(f"KNN decision boundaries\n(weights={weights!r})")
-        plt.savefig(plot_graph_name(self.model_type, self.train_scope))
+
+        plt.savefig(save_plot(f'{self.strategy}-{self.scope}-graph'))
 
     def evaluate(self, x_test, y_test):
         self.accuracy = self.classifier.score(x_test, y_test)
-        y_pred = self.classifier.predict(x_test)
-        self.precision = precision_score(y_test, y_pred, average='macro')
-        self.recall = recall_score(y_test, y_pred, average='macro')
-        self.f1 = f1_score(y_test, y_pred, average='macro')
+        self.predictions = self.classifier.predict(x_test)
+        self.precision = precision_score(
+            y_test, self.predictions, average='macro')
+        self.recall = recall_score(y_test, self.predictions, average='macro')
+        self.f1 = f1_score(y_test, self.predictions, average='macro')
 
         self.log(f"Model Accuracy: {self.accuracy:.2f}")
         self.log(f"Precision: {self.precision:.2f}")
@@ -232,16 +256,15 @@ class Model:
         self.test_labels_pred = self.classifier.predict(test_img_flat)
         self.log(
             f"Test Set Predicted Labels: \n{self.test_labels_pred}")
-
+        target_names = ['Normal 0', 'Actionable 1', 'Benign 2', 'Cancer 3']
         classification_rep = classification_report(
-            self.test_labels, self.test_labels_pred)
-        self.log(f"Classification Report:\n{classification_rep}")
+            self.test_labels, self.test_labels_pred, target_names=target_names)
+        self.log(f"\n\nClassification Report:\n{classification_rep}")
 
     def train(self):
         self.log("Training Starting...")
-
-        self.train_set_length, train_loader = self.load_dataset('train')
-        self.test_set_length, test_loader = self.load_dataset('test')
+        self.train_length, train_loader = self.load_dataset(self.dataset_name)
+        self.test_length, test_loader = self.load_dataset(self.dataset_name)
 
         self.train_imgs, self.train_labels, _ = self.load_full_data(
             train_loader)
@@ -249,26 +272,12 @@ class Model:
         self.test_imgs, self.test_labels, self.test_patient_ids = self.load_full_data(
             test_loader)
 
-        self.log(f"Shape of training images: {self.train_imgs.shape}")
-        self.log(f"Shape of training labels: {self.train_labels.shape}")
-
-        self.log(f"Shape of test images: {self.test_imgs.shape}")
-        self.log(f"Shape of test labels: {self.test_labels.shape}")
-
-        self.log(
-            f"Training label distribution: {np.bincount(self.train_labels)}")
-        self.log(
-            f"Testing label distribution: {np.bincount(self.test_labels)}")
-
         x_flat = self.train_imgs.reshape(self.train_imgs.shape[0], -1)
         y_flat = self.train_labels
-
         x_train, x_test, y_train, y_test = train_test_split(
             x_flat, y_flat, test_size=0.1, stratify=y_flat)
-        self.classifier.fit(x_train, y_train)
-        self.create_pickle()
-        self.evaluate(x_test, y_test)
-        self.render_matrix('test')
-        self.render_sampled_test_imgs_with_labels()
 
-        self.render_knn_plot()
+        self.classifier.fit(x_train, y_train)
+        self.evaluate(x_test, y_test)
+
+        self.create_pickle()
