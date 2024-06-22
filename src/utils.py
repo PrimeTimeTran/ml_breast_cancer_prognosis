@@ -9,8 +9,11 @@ save_dir = os.path.join(base_dir, '../tmp/output')
 plots_dir = os.path.join(base_dir, '../tmp/plots')
 logs_dir = os.path.join(base_dir, '../tmp/logs')
 
-def plot_file_name(type, model_type):
-    return os.path.join(plots_dir, f'{model_type}-confusion-matrix-for-{type}-data.png')
+def plot_file_name(model_type, train_scope, set_type):
+    return os.path.join(plots_dir, f'{model_type}-{train_scope}-{set_type}-confusion-matrix.png')
+
+def plot_graph_name(model_type, train_scope):
+    return os.path.join(plots_dir, f'{model_type}-{train_scope}-graph.png')
 
 def load_pickle(model):
     try:

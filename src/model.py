@@ -4,8 +4,10 @@ import numpy as np
 import pandas as pd
 from sklearn import svm
 import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.inspection import DecisionBoundaryDisplay
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix, precision_score, recall_score, f1_score, classification_report
 
@@ -15,32 +17,52 @@ from .data_loader import DataLoader
 
 from .utils import (
     base_dir,
-    load_pickle,
     plot_file_name,
     setup_logger,
     image_file_name,
     setup_save_directory,
+    plot_graph_name,
 )
 
 
 class Model:
-    def __init__(self, model_type):
-        start_time = time.time()
+    def __init__(self, model_type, train_scope):
         setup_save_directory()
         plt.style.use("ggplot")
+        self.train_scope = train_scope
         self.model_type = model_type
         self.logger = setup_logger(model_type)
-        self.classifier = self.select_classifier()
-        self.train()
-        self.log_train_summary(start_time)
+        self.classifier = None
+        self.train_imgs = None
+        self.train_labels = None
+        self.test_imgs = None
+        self.test_labels = None
+
+    @classmethod
+    def from_pickle(cls, filepath):
+        with open(filepath, 'rb') as f:
+            data = pickle.load(f)
+
+        instance = cls(model_type=data['model_type'], train_scope=data['train_scope'])
+        instance.classifier = data.get('classifier')
+        instance.train_imgs = data.get('train_imgs')
+        instance.train_labels = data.get('train_labels')
+        instance.test_imgs = data.get('test_imgs')
+        instance.test_labels = data.get('test_labels')
+
+        return instance
+
+    def log(self, value):
+        self.logger.info(value)
 
     def log_train_summary(self, start_time):
         end_time = time.time()
         duration = end_time - start_time
         minutes, seconds = divmod(duration, 60)
-        self.logger.info(f"Training time: {int(minutes)}:{int(seconds):02d}")
+        time_elapsed = f'{int(minutes)}:{int(seconds):02d}'
+        self.log(f"Training time: {time_elapsed}")
 
-        csv_file = f'{base_dir}/../tmp/model_summaries.csv'
+        csv_file = f'{base_dir}/../tmp/training_summaries.csv'
         df = pd.read_csv(csv_file)
         new_data = {
             'Model': [self.model_type],
@@ -50,39 +72,83 @@ class Model:
             'Precision': [f'{self.precision:.2f}'],
             'Recall': [f'{self.recall:.2f}'],
             'F1-score': [f'{self.f1:.2f}'],
-            'Time Elapsed': [f'{self.f1:.2f}']
+            'Time Elapsed': [f'{time_elapsed}']
         }
         df_new = pd.DataFrame(new_data)
         df = pd.concat([df, df_new], ignore_index=True)
         df.to_csv(csv_file, index=False)
-        
+
         print(f"Data appended and written back to {csv_file}.")
 
+    def load_dataset(self, set_type):
+        self.log(f"Loading {set_type.capitalize()} Data Set...")
+        dataset = DataLoader(
+            f'tmp/{set_type}/BCS-DBT-labels-{set_type}-v2-{self.train_scope}.csv', set_type)
+        length = len(dataset)
+        loader = TorchDataLoader(
+            dataset, batch_size=32, shuffle=True, num_workers=4)
+        return [length, loader]
+
+    def load_full_data(self, data_loader):
+        images = []
+        labels = []
+        patient_ids = []
+        for batch in data_loader:
+            image_batch, label_batch, patient_id_batch = batch
+            images.extend(image_batch.numpy())
+            labels.extend(label_batch.numpy())
+            patient_ids.extend(patient_id_batch)
+
+        return np.array(images), np.array(labels), np.array(patient_ids)
+
     def select_classifier(self):
-        # These don't use epochs.
-        # RandomForestClassifier, KNeighborsClassifier
         if self.model_type == "KNN":
-            # KNN doesn't have confidence score.
-            self.logger.info(
+            self.log(
                 "KNearestNeighbors with n_neighbors = 5, algorithm = auto, n_jobs = 10")
             return KNeighborsClassifier(algorithm="auto", n_jobs=10)
         elif self.model_type == "SVM":
-            # Has confidence score.
-            self.logger.info(
+            self.log(
                 "SupportVectorMachines with gamma=0.1, kernel='poly'")
             return svm.SVC(gamma=0.1, kernel="poly")
         else:
-            self.logger.info(
+            self.log(
                 "RandomForestClassifier with n_estimators=100, random_state=42")
             return RandomForestClassifier(n_estimators=100, random_state=42)
 
     def create_pickle(self):
-        # ckpt - old, pickle allows embedding malicious code
-        # safetensor
-        with open(f'tmp/models/{self.model_type}_DBT.pickle', 'wb') as f:
-            pickle.dump(self.classifier, f)
-        pickle_in = open(f'tmp/models/{self.model_type}_DBT.pickle', 'rb')
-        self.classifier = pickle.load(pickle_in)
+        self.log("Creating Pickle...")
+        data = {
+            'train_scope': self.train_scope,
+            'train_imgs': self.train_imgs,
+            'train_labels': self.train_labels,
+            'test_imgs': self.test_imgs,
+            'test_labels': self.test_labels,
+            'model_type': self.model_type
+        }
+
+        pickle_file = f'tmp/models/{self.model_type.lower()}_{self.train_scope.lower()}_classifier.pickle'
+
+        with open(pickle_file, 'wb') as f:
+            pickle.dump(data, f)
+
+        with open(pickle_file, 'rb') as f:
+            loaded_data = pickle.load(f)
+
+            assert (loaded_data['train_imgs'] ==
+                    self.train_imgs).all(), "Train images mismatch"
+            assert (loaded_data['train_labels'] ==
+                    self.train_labels).all(), "Train labels mismatch"
+            assert (loaded_data['test_imgs'] ==
+                    self.test_imgs).all(), "Test images mismatch"
+            assert (loaded_data['test_labels'] ==
+                    self.test_labels).all(), "Test labels mismatch"
+
+        self.log(
+            f"Successfully created and verified pickle file: {pickle_file}")
+
+    def fit_classifier(self):
+        self.classifier.fit(self.train_imgs.reshape(
+            self.train_imgs.shape[0], -1), self.train_labels)
 
     def render_matrix(self, set_type):
         matrix = confusion_matrix(self.test_labels, self.test_labels_pred)
@@ -91,7 +157,7 @@ class Model:
         plt.colorbar()
         plt.ylabel("True label")
         plt.xlabel("Predicted label")
-        plt.savefig(plot_file_name(self.model_type, set_type))
+        plt.savefig(plot_file_name(self.model_type, self.train_scope, set_type))
         plt.clf()
 
     def render_sampled_test_imgs_with_labels(self):
@@ -118,14 +184,37 @@ class Model:
             plt.savefig(filename)
             plt.clf()
 
-    def load_dataset(self, set_type):
-        self.logger.info(f"Loading {set_type.capitalize()} Data Set...")
-        dataset = DataLoader(
-            f'tmp/{set_type}/BCS-DBT-labels-{set_type}-v2.csv', set_type)
-        length = len(dataset)
-        loader = TorchDataLoader(
-            dataset, batch_size=32, shuffle=True, num_workers=4)
-        return [length, loader]
+    def render_knn_plot(self):
+        self.logger.info("Plotting KNN...")
+        train_imgs_flat = self.train_imgs.reshape(len(self.train_imgs), -1)
+        test_imgs_flat = self.test_imgs.reshape(len(self.test_imgs), -1)
+        pca = PCA(n_components=2)
+        x_train_pca = pca.fit_transform(train_imgs_flat)
+        x_test_pca = pca.transform(test_imgs_flat)
+        
+        _, axs = plt.subplots(ncols=2, figsize=(12, 5))
+        
+        for ax, weights in zip(axs, ("uniform", "distance")):
+            self.classifier.set_params(weights=weights)
+            self.classifier.fit(x_train_pca, self.train_labels)
+            disp = DecisionBoundaryDisplay.from_estimator(
+                self.classifier,
+                x_test_pca,
+                response_method="predict",
+                plot_method="pcolormesh",
+                shading="auto",
+                alpha=0.5,
+                ax=ax,
+            )
+            scatter = disp.ax_.scatter(x_test_pca[:, 0], x_test_pca[:, 1], c=self.test_labels, edgecolors="k")
+            disp.ax_.legend(
+                scatter.legend_elements()[0],
+                np.unique(self.test_labels),
+                loc="lower left",
+                title="Classes",
+            )
+            ax.set_title(f"KNN decision boundaries\n(weights={weights!r})")
+        plt.savefig(plot_graph_name(self.model_type, self.train_scope))
 
     def evaluate(self, x_test, y_test):
         self.accuracy = self.classifier.score(x_test, y_test)
@@ -134,61 +223,41 @@ class Model:
         self.recall = recall_score(y_test, y_pred, average='macro')
         self.f1 = f1_score(y_test, y_pred, average='macro')
 
-        self.logger.info(f"Model Accuracy: {self.accuracy:.2f}")
-        self.logger.info(f"Precision: {self.precision:.2f}")
-        self.logger.info(f"Recall: {self.recall:.2f}")
-        self.logger.info(f"F1-score: {self.f1:.2f}")
+        self.log(f"Model Accuracy: {self.accuracy:.2f}")
+        self.log(f"Precision: {self.precision:.2f}")
+        self.log(f"Recall: {self.recall:.2f}")
+        self.log(f"F1-score: {self.f1:.2f}")
 
         test_img_flat = self.test_imgs.reshape(self.test_imgs.shape[0], -1)
         self.test_labels_pred = self.classifier.predict(test_img_flat)
-        self.logger.info(
+        self.log(
             f"Test Set Predicted Labels: \n{self.test_labels_pred}")
 
         classification_rep = classification_report(
             self.test_labels, self.test_labels_pred)
-        self.logger.info(f"Classification Report:\n{classification_rep}")
-
-    def load_full_data(self, data_loader):
-        images = []
-        labels = []
-        patient_ids = []
-        for batch in data_loader:
-            image_batch, label_batch, patient_id_batch = batch
-            images.extend(image_batch.numpy())
-            labels.extend(label_batch.numpy())
-            patient_ids.extend(patient_id_batch)
-
-        return np.array(images), np.array(labels), np.array(patient_ids)
-
-    def predict(self, data_to_predict):
-        loaded_model = load_pickle(self.model_type)
-        if loaded_model:
-            predictions = loaded_model.predict(data_to_predict)
-            self.logger.info(predictions)
-        else:
-            self.logger.info("Failed to load the model.")
+        self.log(f"Classification Report:\n{classification_rep}")
 
     def train(self):
-        self.logger.info("Training Starting...")
+        self.log("Training Starting...")
 
         self.train_set_length, train_loader = self.load_dataset('train')
         self.test_set_length, test_loader = self.load_dataset('test')
 
         self.train_imgs, self.train_labels, _ = self.load_full_data(
             train_loader)
+
         self.test_imgs, self.test_labels, self.test_patient_ids = self.load_full_data(
             test_loader)
 
-        self.logger.info(f"Shape of training images: {self.train_imgs.shape}")
-        self.logger.info(
-            f"Shape of training labels: {self.train_labels.shape}")
+        self.log(f"Shape of training images: {self.train_imgs.shape}")
+        self.log(f"Shape of training labels: {self.train_labels.shape}")
 
-        self.logger.info(f"Shape of test images: {self.test_imgs.shape}")
-        self.logger.info(f"Shape of test labels: {self.test_labels.shape}")
+        self.log(f"Shape of test images: {self.test_imgs.shape}")
+        self.log(f"Shape of test labels: {self.test_labels.shape}")
 
-        self.logger.info(
+        self.log(
             f"Training label distribution: {np.bincount(self.train_labels)}")
-        self.logger.info(
+        self.log(
             f"Testing label distribution: {np.bincount(self.test_labels)}")
 
         x_flat = self.train_imgs.reshape(self.train_imgs.shape[0], -1)
@@ -202,4 +271,4 @@ class Model:
         self.render_matrix('test')
         self.render_sampled_test_imgs_with_labels()
 
-        self.logger.info("Training done")
+        self.render_knn_plot()

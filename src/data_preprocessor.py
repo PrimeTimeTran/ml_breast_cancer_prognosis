@@ -10,7 +10,7 @@ from .utils import base_dir, get_data_file, get_files
 
 class DataPreProcessor():
     @classmethod
-    def update_paths(self, set_type):
+    def update_paths(cls, set_type):
         csv_file = get_data_file(set_type)
         with open(csv_file, 'r') as file:
             reader = csv.reader(file)
@@ -30,7 +30,7 @@ class DataPreProcessor():
         print("CSV file has been updated successfully.")
 
     @classmethod
-    def update_column_index(self, set_type):
+    def update_column_index(cls, set_type):
         csv_file = get_data_file(set_type)
         df = pd.read_csv(csv_file)
         cols = list(df.columns)
@@ -39,14 +39,14 @@ class DataPreProcessor():
         df.to_csv(csv_file, index=False)
 
     @classmethod
-    def sort_by_patient_ids(self, patient_id):
+    def sort_by_patient_ids(cls, patient_id):
         match = re.match(r"([a-zA-Z]+)([0-9]+)", patient_id)
         if match:
             return match.group(1), int(match.group(2))
         return patient_id, 0
 
     @classmethod
-    def update_folder_name(self, row, set_type):
+    def update_folder_name(cls, row, set_type):
         search_dir = os.path.join(
             base_dir, f'../tmp/{set_type}/manifest-1617905855234/Breast-Cancer-Screening-DBT')
         if len(row) > 2 and row[3] != None:
@@ -65,7 +65,7 @@ class DataPreProcessor():
                         break
 
     @classmethod
-    def cleanse_data(self, set_type):
+    def cleanse_data(cls, set_type):
         csv_file = get_data_file(set_type)
         df = pd.read_csv(csv_file)
         df_cleaned = df.groupby(['PatientID', 'View'], as_index=False).first()
@@ -74,7 +74,7 @@ class DataPreProcessor():
         df_cleaned.to_csv(csv_file, index=False)
 
     @classmethod
-    def generate_pngs(self, set_type):
+    def generate_pngs(cls, set_type):
         csv_file = get_data_file(set_type)
         df = pd.read_csv(csv_file)
         patient_counts = df['PatientID'].value_counts()
@@ -104,7 +104,7 @@ class DataPreProcessor():
                     print(f"An error occurred: {e}")
 
     @classmethod
-    def sort_rows(self, set_type):
+    def sort_rows(cls, set_type):
         for _, file in enumerate(get_files(set_type)):
             df = pd.read_csv(file)
             df = df.sort_values(
