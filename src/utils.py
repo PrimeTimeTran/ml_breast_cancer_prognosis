@@ -1,8 +1,8 @@
 import os
 import sys
-import shutil
 import pickle
 import logging
+from datetime import datetime
 
 base_dir = os.path.dirname(os.path.abspath(__file__))
 save_dir = os.path.join(base_dir, '../tmp/output')
@@ -34,12 +34,10 @@ def image_file_name(type, patient_id, label, predicted_label):
         save_dir, f'{type}-{patient_id}-labeled-{label}-labeled-by-model-{predicted_label}.png')
 
 def setup_logger(name):
-    log_path = os.path.join(logs_dir, name)
-    if os.path.exists(log_path):
-        prev_log_path = log_path.replace('.log', '-prev.log')
-        if os.path.exists(prev_log_path):
-            os.remove(prev_log_path)
-        shutil.move(log_path, prev_log_path)
+    current_datetime = datetime.now().strftime('%m-%d-%y_%H-%M-%S')
+    log_filename = f"{current_datetime}_{name}-summary.log"
+    log_path = os.path.join(logs_dir, log_filename)
+
     logger = logging.getLogger(name)
     logger.setLevel(logging.DEBUG)
     console_handler = logging.StreamHandler(sys.stdout)

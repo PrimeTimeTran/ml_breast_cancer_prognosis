@@ -5,6 +5,7 @@ from PIL import Image
 from torchvision import transforms
 from torch.utils.data import Dataset
 
+
 class DataLoader(Dataset):
     def __init__(self, csv_file, set_type):
         self.data = pd.read_csv(csv_file)
@@ -20,7 +21,8 @@ class DataLoader(Dataset):
 
     def __getitem__(self, idx):
         row = self.data.iloc[idx]
-        img_path = os.path.join(self.image_dir, f"{row['PatientID']}-{row['View']}.png")
+        img_path = os.path.join(
+            self.image_dir, f"{row['PatientID']}-{row['View']}.png")
 
         image = self.load_image(img_path)
         label = self.convert_label(row)
@@ -49,4 +51,3 @@ class DataLoader(Dataset):
             return image
         except:
             return Image.fromarray((torch.zeros((256, 256, 3)).numpy().astype('uint8')))
-

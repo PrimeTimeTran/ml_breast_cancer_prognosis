@@ -6,13 +6,14 @@ import matplotlib.pyplot as plt
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, confusion_matrix, precision_score, recall_score, f1_score
+from sklearn.metrics import accuracy_score, confusion_matrix, precision_score, recall_score, f1_score, classification_report
 
 from torch.utils.data import DataLoader as TorchDataLoader
 
 from .data_loader import DataLoader
 
 from .utils import (
+    base_dir,
     load_pickle,
     plot_file_name,
     setup_logger,
@@ -20,18 +21,19 @@ from .utils import (
     setup_save_directory,
 )
 
+
 class Model:
     def __init__(self, type):
         setup_save_directory()
         plt.style.use("ggplot")
         self.model_type = type
-        self.logger = setup_logger(f"{type}-summary.log")
+        self.logger = setup_logger(type)
         self.classifier = self.get_model_type()
         self.train()
-        self.document_summary()
+        self.add_train_summary()
 
-    def document_summary(self):
-        csv_file = '/Users/future/Documents/Work/_Main/.Projects/ML_DBT_Classifier/tmp/model_summaries.csv'
+    def add_train_summary(self):
+        csv_file = f'{base_dir}/../tmp/model_summaries.csv'
         df = pd.read_csv(csv_file)
         new_data = {
             'Model': [self.model_type],
@@ -51,14 +53,17 @@ class Model:
         # RandomForestClassifier, KNeighborsClassifier
         if self.model_type == "KNN":
             # KNN doesn't have confidence score.
-            self.logger.info("KNearestNeighbors with n_neighbors = 5, algorithm = auto, n_jobs = 10")
+            self.logger.info(
+                "KNearestNeighbors with n_neighbors = 5, algorithm = auto, n_jobs = 10")
             return KNeighborsClassifier(n_neighbors=5, algorithm="auto", n_jobs=10)
         elif self.model_type == "SVM":
             # Has confidence score.
-            self.logger.info("SupportVectorMachines with gamma=0.1, kernel='poly'")
+            self.logger.info(
+                "SupportVectorMachines with gamma=0.1, kernel='poly'")
             return svm.SVC(gamma=0.1, kernel="poly")
         else:
-            self.logger.info("RandomForestClassifier with n_estimators=100, random_state=42")
+            self.logger.info(
+                "RandomForestClassifier with n_estimators=100, random_state=42")
             return RandomForestClassifier(n_estimators=100, random_state=42)
 
     def create_pickle(self):
@@ -73,7 +78,7 @@ class Model:
         self.logger.info(f"Trained Classifier Confidence: {confidence}")
         self.logger.info(f"Predicted Values: {y_pred}")
         self.logger.info(f"Accuracy of Classifier on Validation Image Data: {accuracy}")
-        self.logger.info(f"Confusion Matrix: \n{conf_mat}")
+        self.logger.info(f"Confusion Matrix for Validation Data: \n{conf_mat}")
 
         plt.matshow(conf_mat)
         plt.title("Confusion Matrix for Validation Data")
@@ -117,10 +122,12 @@ class Model:
                 image_data = np.transpose(image_data, (1, 2, 0))
 
             plt.imshow(image_data, cmap='gray')
-            plt.title(f"PatientID: {patient_id}\nLabeled Actual: {label}\nLabel Predicted: {predicted_label}", fontsize=8, color='blue')
+            plt.title(
+                f"PatientID: {patient_id}\nLabeled Actual: {label}\nLabel Predicted: {predicted_label}", fontsize=8, color='blue')
 
             plt.colorbar()
-            filename = image_file_name(self.model_type, patient_id, label, f'{predicted_label}')
+            filename = image_file_name(
+                self.model_type, patient_id, label, predicted_label)
             plt.savefig(filename)
             plt.clf()
 
@@ -180,6 +187,10 @@ class Model:
         self.test_labels_pred = self.classifier.predict(test_img_flat)
         self.logger.info(f"Predicted labels for test image: {self.test_labels_pred}")
 
+        self.logger.info("Calculating Classification Report...")
+        classification_rep = classification_report(self.test_labels, self.test_labels_pred)
+        self.logger.info(f"Classification Report:\n{classification_rep}")
+
         self.logger.info("Calculating Accuracy of trained Classifier...")
         confidence = self.classifier.score(x_test, y_test)
         y_pred = self.classifier.predict(x_test)
@@ -189,22 +200,19 @@ class Model:
         self.logger.info("Training done")
 
     def load_full_data(self, data_loader):
-        batch_idx = 0
         images = []
         labels = []
         patient_ids = []
         for batch in data_loader:
-            self.logger.info(f"Batch index: {batch_idx}")
             image_batch, label_batch, patient_id_batch = batch
             images.extend(image_batch.numpy())
             labels.extend(label_batch.numpy())
             patient_ids.extend(patient_id_batch)
-            batch_idx += 1
 
         return np.array(images), np.array(labels), np.array(patient_ids)
 
     def predict(self, data_to_predict):
-        loaded_model = load_pickle('KNN')
+        loaded_model = load_pickle(self.model_type)
         if loaded_model:
             predictions = loaded_model.predict(data_to_predict)
             self.logger.info(predictions)

@@ -25,6 +25,18 @@ if __name__ == "__main__":
         Model('KNN')
     elif fn_name == 'save_tensor':
         save_tensor()
+    elif fn_name == 'check_collisions':
+        data_dir1 = "/Users/future/Documents/Work/_Main/.Projects/ML_DBT_Classifier/tmp/train/manifest-1617905855234/Breast-Cancer-Screening-DBT"
+        data_dir2 = "/Users/future/Documents/Work/_Main/.Projects/ML_DBT_Classifier/tmp/test/manifest-1617905855234/Breast-Cancer-Screening-DBT"
+        collision_pairs = DataPreProcessor.check_collisions(data_dir1, data_dir2)
+
+        if collision_pairs:
+            print("Collisions found:")
+        for pair in collision_pairs:
+            print(f"File 1: {pair[0]}")
+            print(f"File 2: {pair[1]}\n")
+        else:
+            print("No collisions found between directories.")
     else:
         print(f"Function {fn_name} is not recognized.")
         sys.exit(1)

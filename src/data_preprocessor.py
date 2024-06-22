@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from .dcm_reader import view_image
 from .utils import base_dir, get_data_file, get_files
 
+
 class DataPreProcessor():
     @classmethod
     def update_column_index(self, set_type):
@@ -32,7 +33,8 @@ class DataPreProcessor():
             old_folder_path = row[3]
             old_folder_name = old_folder_path.split('/')[-2]
             search_value = old_folder_name.split('-')[0]
-            search_path = os.path.join(search_dir, row[0], row[3].split('/')[2])
+            search_path = os.path.join(
+                search_dir, row[0], row[3].split('/')[2])
             if os.path.exists(search_path):
                 for folder in os.listdir(search_path):
                     if folder.startswith(search_value):
@@ -41,6 +43,7 @@ class DataPreProcessor():
                             old_folder_name, new_folder_name)
                         row[3] = new_folder_path
                         break
+
     @classmethod
     def update_paths(self, set_type):
         csv_file = get_data_file(set_type)
@@ -69,14 +72,16 @@ class DataPreProcessor():
         cleaned_counts = df_cleaned['PatientID'].value_counts()
         print(cleaned_counts)
         df_cleaned.to_csv(csv_file, index=False)
-    
+
     @classmethod
     def generate_pngs(self, set_type):
         csv_file = get_data_file(set_type)
         df = pd.read_csv(csv_file)
         patient_counts = df['PatientID'].value_counts()
-        patient_ids_with_2_or_more = patient_counts[patient_counts >= 2].index.tolist()
-        patient_ids_with_2_or_more.sort(key=DataPreProcessor.sort_by_patient_ids)
+        patient_ids_with_2_or_more = patient_counts[patient_counts >= 2].index.tolist(
+        )
+        patient_ids_with_2_or_more.sort(
+            key=DataPreProcessor.sort_by_patient_ids)
 
         print(f'patient_counts {patient_counts}')
         for _, patient_id in enumerate(patient_ids_with_2_or_more):
@@ -89,7 +94,7 @@ class DataPreProcessor():
             for _, row in patient_rows.iterrows():
                 try:
                     specific_row = df[(df.PatientID == row[0])
-                                    & (df.View == row[1])]
+                                      & (df.View == row[1])]
                     if not specific_row.empty:
                         actual_row_number = specific_row.index[0]
                         view_image(set_type, df, plt, actual_row_number)
@@ -105,3 +110,20 @@ class DataPreProcessor():
             df = df.sort_values(
                 by='PatientID', key=lambda x: x.map(DataPreProcessor.sort_by_patient_ids))
             df.to_csv(file, index=False)
+
+    @classmethod
+    def check_collisions(cls, dir1, dir2):
+        collisions = []
+        filenames = {}
+
+        for directory in [dir1, dir2]:
+            for root, _, files in os.walk(directory):
+                for filename in files:
+                    filepath = os.path.join(root, filename)
+                    basename, _ = os.path.splitext(filename)
+                    if basename in filenames:
+                        collisions.append((filenames[basename], filepath))
+                    else:
+                        filenames[basename] = filepath
+
+            return collisions

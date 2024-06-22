@@ -11,10 +11,12 @@ from .utils import base_dir
 
 FilePathOrBuffer = Union[str, StringIO, BytesIO]
 
+
 def view_image(set_type, df, plt, num):
     view_series = df.iloc[num]
     view = view_series["View"]
-    image_path = os.path.join(base_dir, f"../tmp/{set_type}/manifest-1617905855234/", view_series["descriptive_path"])
+    image_path = os.path.join(
+        base_dir, f"../tmp/{set_type}/manifest-1617905855234/", view_series["descriptive_path"])
     image = dcmread_image(fp=image_path, view=view)
     patient_id = view_series['PatientID']
     filename = f'{patient_id}-{view}.png'
@@ -26,8 +28,10 @@ def view_image(set_type, df, plt, num):
     plt.imshow(resized_image, cmap=plt.cm.gray)
     return image
 
+
 def write_to_disk(plt, output_path, resized_image):
     plt.imsave(output_path, resized_image)
+
 
 def dcmread_image(
     fp: Union[str, "os.PathLike[AnyStr]", BinaryIO],
@@ -58,6 +62,7 @@ def dcmread_image(
     )
     return pixel_array
 
+
 def read_boxes(
     boxes_fp: FilePathOrBuffer, filepaths_fp: FilePathOrBuffer
 ) -> pd.DataFrame:
@@ -75,6 +80,7 @@ def read_boxes(
         )
     return pd.merge(df_boxes, df_filepaths, on=primary_key)
 
+
 def draw_box(
     image: np.ndarray,
     x: int,
@@ -91,12 +97,11 @@ def draw_box(
         color = np.max(image)
     if len(image.shape) > 2 and not hasattr(color, "__len__"):
         color = (color,) + (0,) * (image.shape[-1] - 1)
-    image[y : y + lw, x : x + width] = color
-    image[y + height - lw : y + height, x : x + width] = color
-    image[y : y + height, x : x + lw] = color
-    image[y : y + height, x + width - lw : x + width] = color
+    image[y: y + lw, x: x + width] = color
+    image[y + height - lw: y + height, x: x + width] = color
+    image[y: y + height, x: x + lw] = color
+    image[y: y + height, x + width - lw: x + width] = color
     return image
-
 
 
 def get_image_laterality(pixel_array: np.ndarray) -> str:
