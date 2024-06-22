@@ -10,6 +10,26 @@ from .utils import base_dir, get_data_file, get_files
 
 class DataPreProcessor():
     @classmethod
+    def update_paths(self, set_type):
+        csv_file = get_data_file(set_type)
+        with open(csv_file, 'r') as file:
+            reader = csv.reader(file)
+            rows = list(reader)
+
+        header = rows[0]
+        data_rows = rows[1:]
+
+        for row in data_rows:
+            DataPreProcessor.update_folder_name(row, set_type)
+
+        with open(csv_file, 'w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(header)
+            writer.writerows(data_rows)
+
+        print("CSV file has been updated successfully.")
+
+    @classmethod
     def update_column_index(self, set_type):
         csv_file = get_data_file(set_type)
         df = pd.read_csv(csv_file)
@@ -43,26 +63,6 @@ class DataPreProcessor():
                             old_folder_name, new_folder_name)
                         row[3] = new_folder_path
                         break
-
-    @classmethod
-    def update_paths(self, set_type):
-        csv_file = get_data_file(set_type)
-        with open(csv_file, 'r') as file:
-            reader = csv.reader(file)
-            rows = list(reader)
-
-        header = rows[0]
-        data_rows = rows[1:]
-
-        for row in data_rows:
-            DataPreProcessor.update_folder_name(row, set_type)
-
-        with open(csv_file, 'w', newline='') as file:
-            writer = csv.writer(file)
-            writer.writerow(header)
-            writer.writerows(data_rows)
-
-        print("CSV file has been updated successfully.")
 
     @classmethod
     def cleanse_data(self, set_type):
