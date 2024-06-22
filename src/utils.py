@@ -30,9 +30,9 @@ def setup_save_directory():
     os.makedirs(save_dir, exist_ok=True)
     os.makedirs(plots_dir, exist_ok=True)
 
-def image_file_name(type, idx, value):
+def image_file_name(type, patient_id, label, predicted_label):
     return os.path.join(
-        save_dir, f'{type}-{idx}-original-{value}-predict-{value}.png')
+        save_dir, f'{type}-{patient_id}-labeled-{label}-labeled-by-model-{predicted_label}.png')
 
 def setup_logger(name):
     log_path = os.path.join(logs_dir, name)

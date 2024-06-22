@@ -1,14 +1,10 @@
 import os
-import torch
-import struct
 import pandas as pd
-import numpy as np
-from skimage import io
-from array import array
-import matplotlib.pyplot as plt
+import torch
 from torch.utils.data import Dataset
-import torchvision.transforms as transforms
-
+from torchvision import transforms
+from PIL import Image
+import matplotlib.pyplot as plt
 
 class DataLoader(Dataset):
     def __init__(self, csv_file, set_type):
@@ -26,13 +22,16 @@ class DataLoader(Dataset):
     def __getitem__(self, idx):
         row = self.data.iloc[idx]
         img_path = os.path.join(self.image_dir, f"{row['PatientID']}-{row['View']}.png")
-        image = io.imread(img_path)
+        
+        image = self.load_image(img_path)
         label = self.convert_label(row)
+        patient_id = row['PatientID']
 
         if self.transform:
             image = self.transform(image)
 
-        return image, label
+        return image, label, patient_id
+
     def convert_label(self, row):
         if row['Normal'] == 1:
             return 0
@@ -42,10 +41,13 @@ class DataLoader(Dataset):
             return 2
         elif row['Cancer'] == 1:
             return 3
+        else:
+            return -1
 
     def load_image(self, img_path):
         try:
-            image = plt.imread(img_path)
+            image = Image.open(img_path).convert('RGB')
             return image
         except:
-            return torch.zeros((3, 256, 256))  # Return a dummy image tensor
+            return Image.fromarray((torch.zeros((256, 256, 3)).numpy().astype('uint8')))
+

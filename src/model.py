@@ -23,7 +23,7 @@ class Model:
     def __init__(self, type):
         setup_save_directory()
         plt.style.use("ggplot")
-        self.type = type
+        self.model_type = type
         self.logger = setup_logger(f"{type}-summary.log")
         self.classifier = self.get_model_type()
         self.train()
@@ -31,11 +31,11 @@ class Model:
     def get_model_type(self):
         # These don't use epochs.
         # RandomForestClassifier, KNeighborsClassifier
-        if self.type == "KNN":
+        if self.model_type == "KNN":
             # KNN doesn't have confidence score.
             self.logger.info("KNearestNeighbors with n_neighbors = 5, algorithm = auto, n_jobs = 10")
             return KNeighborsClassifier(n_neighbors=5, algorithm="auto", n_jobs=10)
-        elif self.type == "SVM":
+        elif self.model_type == "SVM":
             # Has confidence score.
             self.logger.info("SupportVectorMachines with gamma=0.1, kernel='poly'")
             return svm.SVC(gamma=0.1, kernel="poly")
@@ -46,9 +46,9 @@ class Model:
     def create_pickle(self):
         # ckpt - old, pickle allows embedding malicious code
         # safetensor -
-        with open(f'tmp/models/{self.type}_DBT.pickle', 'wb') as f:
+        with open(f'tmp/models/{self.model_type}_DBT.pickle', 'wb') as f:
             pickle.dump(self.classifier, f)
-        pickle_in = open(f'tmp/models/{self.type}_DBT.pickle', 'rb')
+        pickle_in = open(f'tmp/models/{self.model_type}_DBT.pickle', 'rb')
         self.classifier = pickle.load(pickle_in)
 
     def render_confusion_matrix(self, confidence, y_pred, accuracy, conf_mat):
@@ -62,29 +62,32 @@ class Model:
         plt.colorbar()
         plt.ylabel("True label")
         plt.xlabel("Predicted label")
-        plt.savefig(plot_file_name(self.type, "validation"))
+        plt.savefig(plot_file_name(self.model_type, "validation"))
+        plt.clf()
 
         self.logger.info(f"Making Predictions on Test Input Images: {self.test_labels_pred}")
-        self.logger.info(f"Calculating Accuracy of Trained Classifier on Test Data: {accuracy}")
+        test_accuracy = accuracy_score(self.test_labels, self.test_labels_pred)
+        self.logger.info(f"Calculating Accuracy of Trained Classifier on Test Data: {test_accuracy}")
 
         self.logger.info("Creating Confusion Matrix for Test Data...")
         conf_mat_test = confusion_matrix(self.test_labels, self.test_labels_pred)
 
         self.logger.info(f"Predicted Labels for Test Images: {self.test_labels_pred}")
-        self.logger.info(f"Accuracy of Classifier on Test Images: {accuracy}")
+        self.logger.info(f"Accuracy of Classifier on Test Images: {test_accuracy}")
         self.logger.info(f"Confusion Matrix for Test Data: \n{conf_mat_test}")
+
         plt.matshow(conf_mat_test)
         plt.title("Confusion Matrix for Test Data")
         plt.colorbar()
         plt.ylabel("True label")
         plt.xlabel("Predicted label")
-        plt.savefig(plot_file_name(self.type, "test"))
+        plt.savefig(plot_file_name(self.model_type, "test"))
         plt.clf()
 
         num_samples = min(len(self.test_img), 20)
         indices = np.random.randint(0, len(self.test_img), num_samples)
 
-        for idx, i in enumerate(indices):
+        for _, i in enumerate(indices):
             if i >= len(self.test_img):
                 continue
             image_data = self.test_img[i]
@@ -92,11 +95,14 @@ class Model:
             predicted_label = self.test_labels_pred[i]
             patient_id = self.test_patient_ids[i]
 
-            plt.imshow(image_data)
-            plt.title(f"PatientID: {patient_id}\nActual Label: {label}\nModel Predicted Label: {predicted_label}", fontsize=8, color='blue')
+            if len(image_data.shape) == 3 and image_data.shape[0] == 3:
+                image_data = np.transpose(image_data, (1, 2, 0))
+
+            plt.imshow(image_data, cmap='gray')
+            plt.title(f"PatientID: {patient_id}\nLabeled Actual: {label}\nLabel Predicted: {predicted_label}", fontsize=8, color='blue')
 
             plt.colorbar()
-            filename = image_file_name(self.type, idx, label)
+            filename = image_file_name(self.model_type, patient_id, label, f'{predicted_label}')
             plt.savefig(filename)
             plt.clf()
 
@@ -105,14 +111,13 @@ class Model:
 
         self.logger.info("Loading Training Data Set...")
         train_dataset = DataLoader('tmp/train/BCS-DBT-labels-train-v2.csv', 'train')
-        train_loader = TorchDataLoader(train_dataset, batch_size=32, shuffle=True, num_workers=4)
+        train_loader = TorchDataLoader(train_dataset, batch_size=2, shuffle=True, num_workers=4)
 
         self.logger.info("Loading Testing Data Set...")
         test_dataset = DataLoader('tmp/test/BCS-DBT-labels-test-v2.csv', 'test')
-        test_loader = TorchDataLoader(test_dataset, batch_size=32, shuffle=False, num_workers=4)
+        test_loader = TorchDataLoader(test_dataset, batch_size=2, shuffle=False, num_workers=4)
 
-        # Convert loaded data to numpy arrays for logging
-        img_train, labels_train, train_patient_ids = self.load_full_data(train_loader)
+        img_train, labels_train, _ = self.load_full_data(train_loader)
         img_test, labels_test, test_patient_ids = self.load_full_data(test_loader)
 
         self.test_img = img_test
@@ -165,16 +170,17 @@ class Model:
         self.logger.info("Training done")
 
     def load_full_data(self, data_loader):
+        batch_idx = 0
         images = []
         labels = []
         patient_ids = []
-        batch_idx = 0
         for batch in data_loader:
             self.logger.info(f"Batch index: {batch_idx}")
-            images.extend(batch['image'].numpy())
-            labels.extend(batch['label'].numpy())
-            patient_ids.extend(batch['patient_id'].numpy())
-            batch_idx+=1
+            image_batch, label_batch, patient_id_batch = batch
+            images.extend(image_batch.numpy())
+            labels.extend(label_batch.numpy())
+            patient_ids.extend(patient_id_batch)
+            batch_idx += 1
 
         return np.array(images), np.array(labels), np.array(patient_ids)
 
