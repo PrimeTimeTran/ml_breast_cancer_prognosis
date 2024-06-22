@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from io import StringIO, BytesIO
 from skimage.exposure import rescale_intensity
-from typing import AnyStr, BinaryIO, Dict, List, NamedTuple, Optional, Union
+from typing import AnyStr, BinaryIO, Optional, Union
 
 from .utils import base_dir
 
