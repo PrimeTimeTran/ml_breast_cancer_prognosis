@@ -11,7 +11,7 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.inspection import DecisionBoundaryDisplay
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import precision_score, recall_score, f1_score, classification_report, ConfusionMatrixDisplay, confusion_matrix
+from sklearn.metrics import accuracy_score, classification_report, ConfusionMatrixDisplay, confusion_matrix
 
 from torch.utils.data import DataLoader as TorchLoader
 
@@ -156,11 +156,11 @@ class Model:
             self.train_imgs.shape[0], -1), self.train_labels)
 
     def render_matrix(self, set_type):
-        cm = confusion_matrix(self.test_labels, self.test_labels_pred)
+        cm = confusion_matrix(self.test_labels, self.predictions)
         self.log("\n\nConfusion Matrix:")
         self.log(f'\n{cm}')
         unique_classes = np.unique(np.concatenate(
-            (self.test_labels, self.test_labels_pred)))
+            (self.test_labels, self.predictions)))
 
         if not set(self.label_map.keys()).issuperset(set(unique_classes)):
             print(f"Unique classes in data: {unique_classes}")
@@ -169,7 +169,7 @@ class Model:
                 "The unique classes in data do not match the expected label mapping.")
 
         disp = ConfusionMatrixDisplay.from_predictions(
-            self.test_labels, self.test_labels_pred, display_labels=self.class_names)
+            self.test_labels, self.predictions, display_labels=self.class_names)
         disp.plot(cmap='viridis')
         plt.title(f"Confusion Matrix: {set_type} set")
         plt.savefig(save_plot(f'{self.strategy}-{self.scope}-confusion-matrix'))
@@ -182,7 +182,7 @@ class Model:
                 continue
             image_data = self.test_imgs[i]
             label = self.test_labels[i]
-            predicted_label = self.test_labels_pred[i]
+            predicted_label = self.predictions[i]
             patient_id = self.test_patient_ids[i]
 
             if len(image_data.shape) == 3 and image_data.shape[0] == 3:
@@ -198,68 +198,92 @@ class Model:
             plt.savefig(filename)
             plt.clf()
 
+    # Tried using ConfusionMatrixDisplay.from_estimator
+    # def render_knn_plot(self):
+    #     print("Shape of self.train_imgs:", self.train_imgs.shape)
+    #     print("Shape of self.test_imgs:", self.test_imgs.shape)
+
+    #     train_imgs_flat = self.train_imgs.reshape(len(self.train_imgs), -1)
+    #     test_imgs_flat = self.test_imgs.reshape(len(self.test_imgs), -1)
+    #     scaler = StandardScaler()
+    #     train_imgs_flat = scaler.fit_transform(train_imgs_flat)
+    #     test_imgs_flat = scaler.transform(test_imgs_flat)
+
+    #     pca = PCA(n_components=2)
+    #     x_train_pca = pca.fit_transform(train_imgs_flat)
+    #     x_test_pca = pca.transform(test_imgs_flat)
+    #     fig, axs = plt.subplots(ncols=2, figsize=(12, 5))
+
+    #     for ax, weights in zip(axs, ("uniform", "distance")):
+    #         self.classifier.set_params(weights=weights)
+    #         self.classifier.fit(x_train_pca, self.train_labels)
+    #         cm = ConfusionMatrixDisplay.from_estimator(
+    #             self.classifier, x_test_pca, self.test_labels, ax=ax
+    #         )
+    #         ax.set_xlim(-1000, 200)
+    #         ax.set_ylim(0, 500)
+
+    #         ax.set_title(f"KNN decision boundaries\n(weights={weights!r})")
+
+    #     plt.tight_layout()
+    #     plt.savefig(save_plot(f'{self.strategy}-{self.scope}-xlim-ylim-graph'))
+
+
     def render_knn_plot(self):
-        self.logger.info("Plotting KNN...")
         print("Shape of self.train_imgs:", self.train_imgs.shape)
         print("Shape of self.test_imgs:", self.test_imgs.shape)
-
         train_imgs_flat = self.train_imgs.reshape(len(self.train_imgs), -1)
         test_imgs_flat = self.test_imgs.reshape(len(self.test_imgs), -1)
         scaler = StandardScaler()
         train_imgs_flat = scaler.fit_transform(train_imgs_flat)
         test_imgs_flat = scaler.transform(test_imgs_flat)
-
         pca = PCA(n_components=2)
         x_train_pca = pca.fit_transform(train_imgs_flat)
         x_test_pca = pca.transform(test_imgs_flat)
-        _, axs = plt.subplots(ncols=2, figsize=(12, 5))
+
+        fig, axs = plt.subplots(ncols=2, figsize=(12, 5))
 
         for ax, weights in zip(axs, ("uniform", "distance")):
             self.classifier.set_params(weights=weights)
             self.classifier.fit(x_train_pca, self.train_labels)
-
             disp = DecisionBoundaryDisplay.from_estimator(
                 self.classifier,
-                x_test_pca,
+                x_train_pca,
                 response_method="predict",
                 plot_method="pcolormesh",
                 shading="auto",
-                alpha=0.5,
                 ax=ax,
             )
 
-            scatter = disp.ax_.scatter(x_test_pca[:, 0], x_test_pca[:, 1], c=self.test_labels, edgecolors="k")
-            disp.ax_.legend(
+            scatter = ax.scatter(x_test_pca[:, 0], x_test_pca[:, 1], c=self.test_labels, edgecolors="k")
+            legend = ax.legend(
                 scatter.legend_elements()[0],
                 np.unique(self.test_labels),
                 loc="lower left",
                 title="Classes",
             )
+            ax.set_xlim(-1000, 200)
+            ax.set_ylim(-1000, 500)
             ax.set_title(f"KNN decision boundaries\n(weights={weights!r})")
 
-        plt.savefig(save_plot(f'{self.strategy}-{self.scope}-graph'))
+        plt.tight_layout()
+        plt.savefig(save_plot(f'{self.strategy}-{self.scope}-xlim-ylim-graph'))
 
-    def evaluate(self, x_test, y_test):
-        self.accuracy = self.classifier.score(x_test, y_test)
-        self.predictions = self.classifier.predict(x_test)
-        self.precision = precision_score(
-            y_test, self.predictions, average='macro')
-        self.recall = recall_score(y_test, self.predictions, average='macro')
-        self.f1 = f1_score(y_test, self.predictions, average='macro')
-
+    def evaluate(self):
+        test_img_flat = self.test_imgs.reshape(self.test_imgs.shape[0], -1)
+        self.predictions = self.classifier.predict(test_img_flat)
+        self.accuracy = accuracy_score(self.test_labels, self.predictions)
+        report = classification_report(self.test_labels, self.predictions, target_names=['Normal 0', 'Actionable 1', 'Benign 2', 'Cancer 3'], output_dict=True)
+        self.precision = report['macro avg']['precision']
+        self.recall = report['macro avg']['recall']
+        self.f1 = report['macro avg']['f1-score']
+        
         self.log(f"Model Accuracy: {self.accuracy:.2f}")
         self.log(f"Precision: {self.precision:.2f}")
         self.log(f"Recall: {self.recall:.2f}")
         self.log(f"F1-score: {self.f1:.2f}")
 
-        test_img_flat = self.test_imgs.reshape(self.test_imgs.shape[0], -1)
-        self.test_labels_pred = self.classifier.predict(test_img_flat)
-        self.log(
-            f"Test Set Predicted Labels: \n{self.test_labels_pred}")
-        target_names = ['Normal 0', 'Actionable 1', 'Benign 2', 'Cancer 3']
-        classification_rep = classification_report(
-            self.test_labels, self.test_labels_pred, target_names=target_names)
-        self.log(f"\n\nClassification Report:\n{classification_rep}")
+        self.log(f"\n\nClassification Report:\n{classification_report(self.test_labels, self.predictions, target_names=['Normal 0', 'Actionable 1', 'Benign 2', 'Cancer 3'])}")
 
     def train(self):
         self.log("Training Starting...")
@@ -274,10 +298,12 @@ class Model:
 
         x_flat = self.train_imgs.reshape(self.train_imgs.shape[0], -1)
         y_flat = self.train_labels
-        x_train, x_test, y_train, y_test = train_test_split(
+        x_train, _, y_train, _ = train_test_split(
             x_flat, y_flat, test_size=0.1, stratify=y_flat)
+        # x_train, x_test, y_train, y_test = train_test_split(
+        #     x_flat, y_flat, test_size=0.1, stratify=y_flat)
 
         self.classifier.fit(x_train, y_train)
-        self.evaluate(x_test, y_test)
+        self.evaluate()
 
         self.create_pickle()
