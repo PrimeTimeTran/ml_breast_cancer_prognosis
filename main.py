@@ -9,7 +9,7 @@ if __name__ == "__main__":
     ap.add_argument("-m", "--method", type=str, default='train_model')
     ap.add_argument("-ds", "--data_set", type=str, default='train')
     ap.add_argument("-cs", "--classification_strategy", type=str, default='KNN')
-    ap.add_argument("-ts", "--train_scope", type=str, default='part')
+    ap.add_argument("-ts", "--train_scope", type=str, default='full')
     args = vars(ap.parse_args())
 
     fn_name = args['method']

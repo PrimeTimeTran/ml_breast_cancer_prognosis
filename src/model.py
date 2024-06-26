@@ -42,6 +42,7 @@ class Model:
         self.class_names = ['Normal', 'Actionable', 'Benign', 'Cancer']
         self.label_map = {0: 'Normal',
                           1: 'Actionable', 2: 'Benign', 3: 'Cancer'}
+        self.target_names = ['Normal 0', 'Actionable 1', 'Benign 2', 'Cancer 3']
 
     @classmethod
     def from_pickle(cls, filepath):
@@ -273,7 +274,21 @@ class Model:
         test_img_flat = self.test_imgs.reshape(self.test_imgs.shape[0], -1)
         self.predictions = self.classifier.predict(test_img_flat)
         self.accuracy = accuracy_score(self.test_labels, self.predictions)
-        report = classification_report(self.test_labels, self.predictions, target_names=['Normal 0', 'Actionable 1', 'Benign 2', 'Cancer 3'], output_dict=True)
+        
+        # ERROR: Full Dataset 
+        # unique_classes = len(set(self.test_labels))
+        # print(unique_classes)
+        # if unique_classes == 4:
+        #     target_names = ['Normal 0', 'Actionable 1', 'Benign 2', 'Cancer 3']
+        # elif unique_classes == 3:
+        #     target_names = ['Normal 0', 'Actionable 1', 'Benign 2']
+        # else:
+        #     raise ValueError(f"Unexpected number of classes: {unique_classes}")
+        # ERROR: Full dataset
+        # target_names = np.unique(np.concatenate(
+        #     (self.test_labels, self.predictions)))
+        
+        report = classification_report(self.test_labels, self.predictions, target_names=self.target_names, output_dict=True)
         self.precision = report['macro avg']['precision']
         self.recall = report['macro avg']['recall']
         self.f1 = report['macro avg']['f1-score']
@@ -299,10 +314,9 @@ class Model:
         x_flat = self.train_imgs.reshape(self.train_imgs.shape[0], -1)
         y_flat = self.train_labels
         x_train, _, y_train, _ = train_test_split(
-            x_flat, y_flat, test_size=0.1, stratify=y_flat)
+            x_flat, y_flat, stratify=y_flat)
         # x_train, x_test, y_train, y_test = train_test_split(
         #     x_flat, y_flat, test_size=0.1, stratify=y_flat)
-
         self.classifier.fit(x_train, y_train)
         self.evaluate()
 
