@@ -25,7 +25,6 @@ from .utils import (
     setup_save_directory,
 )
 
-
 class Model:
     def __init__(self, strategy, scope, dataset_name):
         setup_save_directory()
